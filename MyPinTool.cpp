@@ -106,15 +106,21 @@ static void PrintRegisters(const CONTEXT * ctxt)
 }
 
 
-VOID CountBbl(const CONTEXT * ctxt, UINT32 numInstInBbl)
+VOID BeforeBbl(const CONTEXT * ctxt, UINT32 numInstInBbl, VOID *ip)
 {
     OutFile <<  "===============================================" << endl;
+    OutFile << "This is the basic block at Address: " << static_cast<std::string *>(ip) <<endl;
+    OutFile <<  "-----------------------------------------------" << endl;
     OutFile << "Before Basic Block" << endl;
     PrintRegisters(ctxt);
     bblCount++;
     insCount += numInstInBbl;
+}
+
+VOID AfterBbl(const CONTEXT * ctxt, VOID *ip)
+{
     OutFile <<  "-----------------------------------------------" << endl;
-    OutFile << "After Basic Block" << endl;
+    OutFile << "After Basic Block at Address: " << static_cast<std::string *>(ip) << endl;
     PrintRegisters(ctxt);
     OutFile <<  "===============================================" << endl;
 }
@@ -129,8 +135,11 @@ static VOID Trace(TRACE trace, VOID *v)
     // Visit every basic block in the trace
     for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
     {
+        INS ins = BBL_InsTail(bbl);
         // Insert a call to CountBbl() before every basic bloc, passing the number of instructions
-        BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)CountBbl, IARG_CONST_CONTEXT, IARG_UINT32, BBL_NumIns(bbl), IARG_END);
+        BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)BeforeBbl, IARG_CONST_CONTEXT, IARG_UINT32, BBL_NumIns(bbl), IARG_INST_PTR, IARG_END);
+
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)AfterBbl, IARG_CONST_CONTEXT, IARG_INST_PTR, IARG_END);
     }
 }
 
