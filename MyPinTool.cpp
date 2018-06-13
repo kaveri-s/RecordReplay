@@ -33,8 +33,12 @@ END_LEGAL */
 #include <string>
 #include <iostream>
 #include <cassert>
+#include <iomanip>
 #include "pin.H"
 #include "../Utils/regvalue_utils.h"
+
+#define BEFORE 0
+#define AFTER 1
 
 using std::ofstream;
 
@@ -52,6 +56,9 @@ ofstream OutFile;
 UINT64 insCount = 0;        //number of dynamically executed instructions
 UINT64 bblCount = 0;        //number of dynamically executed basic blocks
 std::ostream * out = &cerr;
+
+//for register Deltas
+ADDRINT regval[16];
 
 /* ===================================================================== */
 // Command line switches
@@ -80,13 +87,19 @@ INT32 Usage()
     return -1;
 }
 
+VOID AddRegValToArr(int reg, ADDRINT val) {
+    regval[reg-3]=val;
+}
 
+ADDRINT GetRegValFromArr(int reg) {
+    return regval[reg-3];
+}
 
 /////////////////////
 // ANALYSIS FUNCTIONS
 /////////////////////
 
-static void PrintRegisters(const CONTEXT * ctxt)
+static void PrintRegisters(const CONTEXT * ctxt, int Order)
 {
     // static const UINT stRegSize = REG_Size(REG_ST_BASE);
     for (int reg = (int)REG_GR_BASE; reg <= (int)REG_GR_LAST; ++reg)
@@ -94,7 +107,16 @@ static void PrintRegisters(const CONTEXT * ctxt)
         // For the integer registers, it is safe to use ADDRINT. But make sure to pass a pointer to it.
         ADDRINT val;
         PIN_GetContextRegval(ctxt, (REG)reg, reinterpret_cast<UINT8*>(&val));
-        OutFile << REG_StringShort((REG)reg) << ": 0x" << hex << val << endl;
+        // OutFile << reg << "..." << REG_StringShort((REG)reg) << ": 0x" << hex << val << endl;
+        if(Order==BEFORE)
+            AddRegValToArr(reg, val);
+        else {
+            ADDRINT oldval = GetRegValFromArr(reg);
+            if(oldval!=val)
+                OutFile << REG_StringShort((REG)reg) << "\t0x" << setw(16) << left << hex << oldval << "\t" << "0x" << hex << val << endl;
+        }
+
+
     }
     for (int reg = (int)REG_ST_BASE; reg <= (int)REG_ST_LAST; ++reg)
     {
@@ -110,9 +132,9 @@ VOID BeforeBbl(const CONTEXT * ctxt, UINT32 numInstInBbl, VOID *ip)
 {
     OutFile <<  "===============================================" << endl;
     OutFile << "This is the basic block at Address: " << static_cast<std::string *>(ip) <<endl;
-    OutFile <<  "-----------------------------------------------" << endl;
-    OutFile << "Before Basic Block" << endl;
-    PrintRegisters(ctxt);
+    // OutFile <<  "-----------------------------------------------" << endl;
+    // OutFile << "Before Basic Block" << endl;
+    PrintRegisters(ctxt, BEFORE);
     bblCount++;
     insCount += numInstInBbl;
 }
@@ -121,7 +143,8 @@ VOID AfterBbl(const CONTEXT * ctxt, VOID *ip)
 {
     OutFile <<  "-----------------------------------------------" << endl;
     OutFile << "After Basic Block at Address: " << static_cast<std::string *>(ip) << endl;
-    PrintRegisters(ctxt);
+    OutFile << "Reg\t" << "Old Val\t\t\t" << "New Val"<< endl;
+    PrintRegisters(ctxt, AFTER);
     OutFile <<  "===============================================" << endl;
 }
 
