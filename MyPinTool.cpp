@@ -58,7 +58,7 @@ UINT64 bblCount = 0;        //number of dynamically executed basic blocks
 std::ostream * out = &cerr;
 
 //for register Deltas
-ADDRINT regval[16];
+ADDRINT regval[24];
 
 /* ===================================================================== */
 // Command line switches
@@ -88,11 +88,17 @@ INT32 Usage()
 }
 
 VOID AddRegValToArr(int reg, ADDRINT val) {
-    regval[reg-3]=val;
+    if(reg<16)
+        regval[reg-3] = val;
+    else
+        regval[reg-55+16] = val;
 }
 
 ADDRINT GetRegValFromArr(int reg) {
-    return regval[reg-3];
+    if(reg<16)
+        return regval[reg-3];
+    else
+        return regval[reg-55+16];
 }
 
 /////////////////////
@@ -118,11 +124,18 @@ static void PrintRegisters(const CONTEXT * ctxt, int Order)
 
 
     }
-    for (int reg = (int)REG_ST_BASE; reg <= (int)REG_ST_LAST; ++reg)
+    for (int reg = (int)REG_XMM_BASE; reg < (int)REG_XMM7; ++reg)
     {
         // For the x87 FPU stack registers, using PIN_REGISTER ensures a large enough buffer.
         PIN_REGISTER val;
         PIN_GetContextRegval(ctxt, (REG)reg, reinterpret_cast<UINT8*>(&val));
+        // if(Order==BEFORE)
+        //     AddRegValToArr(reg, val);
+        // else {
+        //     ADDRINT oldval = GetRegValFromArr(reg);
+        //     if(oldval!=val)
+        //         OutFile << REG_StringShort((REG)reg) << "\t0x" << setw(16) << left << hex << oldval << "\t" << "0x" << hex << val << endl;
+        // }
         // OutFile << REG_StringShort((REG)reg) << ": " << to_string(stRegSize) << endl;
     }
 }
@@ -131,7 +144,7 @@ static void PrintRegisters(const CONTEXT * ctxt, int Order)
 VOID BeforeBbl(const CONTEXT * ctxt, UINT32 numInstInBbl, VOID *ip)
 {
     OutFile <<  "===============================================" << endl;
-    OutFile << "This is the basic block at Address: " << static_cast<std::string *>(ip) <<endl;
+    OutFile << "This is the basic block at Address: \n" << static_cast<std::string *>(ip) <<endl;
     // OutFile <<  "-----------------------------------------------" << endl;
     // OutFile << "Before Basic Block" << endl;
     PrintRegisters(ctxt, BEFORE);
@@ -159,7 +172,7 @@ static VOID Trace(TRACE trace, VOID *v)
     for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
     {
         INS ins = BBL_InsTail(bbl);
-        // Insert a call to CountBbl() before every basic bloc, passing the number of instructions
+        // Insert a call to CountBbl() before every basic block, passing the number of instructions
         BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)BeforeBbl, IARG_CONST_CONTEXT, IARG_UINT32, BBL_NumIns(bbl), IARG_INST_PTR, IARG_END);
 
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)AfterBbl, IARG_CONST_CONTEXT, IARG_INST_PTR, IARG_END);
@@ -195,8 +208,8 @@ int main(int argc, char * argv[])
     TRACE_AddInstrumentFunction(Trace, 0);
     PIN_AddFiniFunction(Fini, 0);
 
-    // Start running the application
-    PIN_StartProgram(); // never returns
+    // Start running the application'\n-----------------------------------------------\n'
+    PIN_StartProgram(); // never ret'\n-----------------------------------------------\n'
 
     return 0;
 }
