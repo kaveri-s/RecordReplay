@@ -114,6 +114,24 @@ const char * StripPath(const char * path)
 // ANALYSIS FUNCTIONS
 /////////////////////
 
+
+FILE * trace;
+
+// Print a memory read record
+static void RecordMemRead(VOID * ip, VOID * addr)
+{
+    outFile << ip << ": R" << addr << endl;
+    // fprintf(trace,"%p: R %p\n", ip, addr);
+}
+
+// Print a memory write record
+static void RecordMemWrite(VOID * ip, VOID * addr)
+{
+    outFile << ip << ": R" << addr << endl;
+    // fprintf(trace,"%p: W %p\n", ip, addr);
+}
+
+
 static void PrintRegisters(const CONTEXT * ctxt, int Order)
 {
     // static const UINT stRegSize = REG_Size(REG_ST_BASE);
@@ -156,6 +174,8 @@ VOID BeforeRoutine(const CONTEXT * ctxt, RTN rtn)
 {
     outFile <<  "===============================================" << endl;
     outFile << "This is the Routine at Address: \n" << RTN_Address(rtn) << dec <<endl;
+    outFile << "-----------------------------------------------" << endl;
+    outFile << "Memory Accesses:" << endl;
     // OutFile <<  "-----------------------------------------------" << endl;
     // OutFile << "Before Basic Block" << endl;
     PrintRegisters(ctxt, BEFORE);
@@ -198,9 +218,36 @@ VOID Routine(RTN rtn, VOID *v)
     INS ins = RTN_InsHead(rtn);
     INS prev = ins;
 
+    
+
     // For each instruction of the routine
     for (; INS_Valid(ins); ins = INS_Next(ins))
     {
+        UINT32 memOperands = INS_MemoryOperandCount(ins);
+
+        // Iterate over each memory operand of the instruction.
+        for (UINT32 memOp = 0; memOp < memOperands; memOp++)
+        {
+            if (INS_MemoryOperandIsRead(ins, memOp))
+            {
+                INS_InsertPredicatedCall(
+                    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
+                    IARG_INST_PTR,
+                    IARG_MEMORYOP_EA, memOp,
+                    IARG_END);
+            }
+            // Note that in some architectures a single memory operand can be 
+            // both read and written (for instance incl (%eax) on IA-32)
+            // In that case we instrument it once for read and once for write.
+            if (INS_MemoryOperandIsWritten(ins, memOp))
+            {
+                INS_InsertPredicatedCall(
+                    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
+                    IARG_INST_PTR,
+                    IARG_MEMORYOP_EA, memOp,
+                    IARG_END);
+            }
+        }
         // Insert a call to docount to increment the instruction counter for this rtn
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_PTR, &(rc->_icount), IARG_END);
         prev=ins;
@@ -231,6 +278,8 @@ VOID Fini(INT32 code, VOID *v)
                   << setw(12) << rc->_icount << endl;
     }
 
+    fprintf(trace, "#eof\n");
+    fclose(trace);
 }
 
 /* ===================================================================== */
@@ -251,10 +300,11 @@ INT32 Usage()
 
 int main(int argc, char * argv[])
 {
+    // trace = fopen("pinatrace.out", "w");
     // Initialize symbol table code, needed for rtn instrumentation
     PIN_InitSymbols();
 
-    outFile.open("proccount.out");
+    outFile.open("mypintool.out");
 
     // Initialize pin
     if (PIN_Init(argc, argv)) return Usage();
@@ -270,3 +320,4 @@ int main(int argc, char * argv[])
     
     return 0;
 }
+
