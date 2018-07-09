@@ -212,6 +212,7 @@ VOID Routine(RTN rtn, VOID *v)
 
     RTN_Open(rtn);
 
+    RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)docount, IARG_PTR, &(rc->_rtnCount), IARG_END);
     // Insert a call at the entry point of a routine to increment the call count
     RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)BeforeRoutine, IARG_CONST_CONTEXT, IARG_UINT32, rtn, IARG_END);
     
@@ -235,6 +236,8 @@ VOID Routine(RTN rtn, VOID *v)
                     IARG_INST_PTR,
                     IARG_MEMORYOP_EA, memOp,
                     IARG_END);
+                INS_InsertPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_PTR, &(rc->_memacc), IARG_END);
+
             }
             // Note that in some architectures a single memory operand can be 
             // both read and written (for instance incl (%eax) on IA-32)
@@ -246,6 +249,7 @@ VOID Routine(RTN rtn, VOID *v)
                     IARG_INST_PTR,
                     IARG_MEMORYOP_EA, memOp,
                     IARG_END);
+                INS_InsertPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_PTR, &(rc->_memacc), IARG_END);
             }
         }
         // Insert a call to docount to increment the instruction counter for this rtn
@@ -262,20 +266,22 @@ VOID Routine(RTN rtn, VOID *v)
 // It prints the name and count for each procedure
 VOID Fini(INT32 code, VOID *v)
 {
-    outFile << setw(23) << "Procedure" << " "
-          << setw(15) << "Image" << " "
-          << setw(18) << "Address" << " "
+    outFile << setw(18) << "Address" << " "
           << setw(12) << "Calls" << " "
-          << setw(12) << "Instructions" << endl;
+          << setw(12) << "Instructions" << " "
+          << setw(12) << "Memory Accesses" << " "
+          << setw(23) << "Procedure" << " "
+          << setw(15) << "Image" << " " << endl;
 
     for (RTN_COUNT * rc = RtnList; rc; rc = rc->_next)
     {
         if (rc->_icount > 0)
-            outFile << setw(23) << rc->_name << " "
-                  << setw(15) << rc->_image << " "
-                  << setw(18) << hex << rc->_address << dec <<" "
+            outFile << setw(18) << hex << rc->_address << dec << " "
                   << setw(12) << rc->_rtnCount << " "
-                  << setw(12) << rc->_icount << endl;
+                  << setw(12) << rc->_icount << " "
+                  << setw(12) << rc->_memacc << " "
+                  << setw(23) << rc->_name << " "
+                  << setw(15) << rc->_image << endl;
     }
 
     fprintf(trace, "#eof\n");
