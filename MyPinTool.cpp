@@ -284,8 +284,8 @@ VOID Fini(INT32 code, VOID *v)
                   << setw(15) << rc->_image << endl;
     }
 
-    fprintf(trace, "#eof\n");
-    fclose(trace);
+    // fprintf(trace, "#eof\n");
+    // fclose(trace);
 }
 
 /* ===================================================================== */
